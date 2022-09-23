@@ -1,31 +1,41 @@
-use cosmwasm_std::{Addr, CustomMsg};
-use ethabi::Bytes;
-use schemars::gen::SchemaGenerator;
+use cosmwasm_std::{Binary, CustomMsg, Uint256};
+use pyth_sdk::{PriceFeed, PriceIdentifier};
 use schemars::JsonSchema;
-use schemars::schema::Schema;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
     pub target_contract_info: TargetContractInfo,
+    pub price_contract: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
-    GetDeposit {token_id: u128, lower_tick: i32, depositor: String, deadline: u64},
+    GetDeposit {
+        token_id: u128,
+        sqrt_price_x96: Uint256,
+        deadline: u64,
+    },
     PutWithdraw {},
-    GetWithdraw {token_ids: Vec<u128>},
     PutCancel {},
-    GetCancel {token_ids: Vec<u128>},
+    GetWithdraw {
+        token_ids: Vec<u128>,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
-    // GetCount returns the current count as a json-encoded number
     DepositList {},
     WithdrawableList {},
+    CancelableList {},
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum PythBridgeQueryMsg {
+    PriceFeed { id: PriceIdentifier },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -35,6 +45,7 @@ pub struct TokenIdList {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct TargetContractInfo {
+    pub method: String,
     pub chain_id: String,
     pub compass_id: String,
     pub contract_address: String,
@@ -43,19 +54,16 @@ pub struct TargetContractInfo {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-pub struct MultipleIdMsg {
+pub struct CustomResponseMsg {
     pub target_contract_info: TargetContractInfo,
-    pub method: String,
-    pub token_ids: Vec<u128>,
+    pub payload: Binary,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-pub struct SingleIdMsg {
-    pub target_contract_info: TargetContractInfo,
-    pub method: String,
-    pub token_id: u128,
+pub struct PriceFeedResponse {
+    /// Pyth Price Feed
+    pub price_feed: PriceFeed,
 }
 
-impl CustomMsg for MultipleIdMsg {}
-impl CustomMsg for SingleIdMsg {}
+impl CustomMsg for CustomResponseMsg {}
