@@ -5,8 +5,8 @@ use cosmwasm_std::{
     Response, StdResult, Uint256, Uint512, WasmQuery,
 };
 use cw2::set_contract_version;
-use ethabi::ethereum_types::H256;
-use ethabi::{Address, Contract, Function, Int, Param, ParamType, StateMutability, Token, Uint};
+use ethabi::ethereum_types::H160;
+use ethabi::{Contract, Function, Int, Param, ParamType, StateMutability, Token, Uint};
 use pyth_sdk::PriceIdentifier;
 use std::collections::BTreeMap;
 use std::ops::{Div, Mul};
@@ -50,7 +50,6 @@ pub fn execute(
             amount,
             lower_tick,
             lower_sqrt_price_x96,
-            upper_tick,
             deadline,
         } => put_deposit(
             deps,
@@ -58,7 +57,6 @@ pub fn execute(
             amount,
             lower_tick,
             lower_sqrt_price_x96,
-            upper_tick,
             deadline,
         ),
         ExecuteMsg::GetDeposit {
@@ -82,7 +80,6 @@ fn put_deposit(
     amount: Uint256,
     lower_tick: i32,
     lower_sqrt_price_x96: Uint256,
-    upper_tick: i32,
     deadline: u64,
 ) -> Result<Response<CustomResponseMsg>, ContractError> {
     let target_contract_info = TARGET_CONTRACT_INFO.load(deps.storage)?;
@@ -115,11 +112,6 @@ fn put_deposit(
                         internal_type: None,
                     },
                     Param {
-                        name: "upper_tick".to_string(),
-                        kind: ParamType::Int(24),
-                        internal_type: None,
-                    },
-                    Param {
                         name: "deadline".to_string(),
                         kind: ParamType::Uint(256),
                         internal_type: None,
@@ -143,13 +135,12 @@ fn put_deposit(
                     .function("deposit")
                     .unwrap()
                     .encode_input(&[
-                        Token::Address(Address::from(H256::from_str(depositor.as_str()).unwrap())),
+                        Token::Address(H160::from_str(depositor.as_str()).unwrap()),
                         Token::Uint(Uint::from_big_endian(amount.to_be_bytes().as_slice())),
                         Token::Int(Int::from(lower_tick)),
                         Token::Uint(Uint::from_big_endian(
                             lower_sqrt_price_x96.to_be_bytes().as_slice(),
                         )),
-                        Token::Int(Int::from(upper_tick)),
                         Token::Uint(Uint::from(deadline)),
                     ])
                     .unwrap(),

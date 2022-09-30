@@ -17,7 +17,6 @@ pub enum ExecuteMsg {
         amount: Uint256,
         lower_tick: i32,
         lower_sqrt_price_x96: Uint256,
-        upper_tick: i32,
         deadline: u64,
     },
     GetDeposit {
