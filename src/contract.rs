@@ -5,17 +5,19 @@ use cosmwasm_std::{
     Response, StdResult, Uint256, Uint512, WasmQuery,
 };
 use cw2::set_contract_version;
-use ethabi::{Contract, Function, Param, ParamType, StateMutability, Token, Uint};
+use ethabi::ethereum_types::H160;
+use ethabi::{Contract, Function, Int, Param, ParamType, StateMutability, Token, Uint};
 use pyth_sdk::PriceIdentifier;
 use std::collections::BTreeMap;
 use std::ops::{Div, Mul};
+use std::str::FromStr;
 
 use crate::error::ContractError;
 use crate::msg::PythBridgeQueryMsg::PriceFeed;
 use crate::msg::{
     CustomResponseMsg, ExecuteMsg, InstantiateMsg, PriceFeedResponse, QueryMsg, TokenIdList,
 };
-use crate::state::{Deposit, DEPOSIT, ETH_USD, PRICE_CONTRACT, TARGET_CONTRACT_INFO};
+use crate::state::{Deposit, DEPOSIT, ETH_USD, OWNER, PRICE_CONTRACT, TARGET_CONTRACT_INFO};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:limit-order-bot";
@@ -25,11 +27,12 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
-    _info: MessageInfo,
+    info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response<CustomResponseMsg>, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     TARGET_CONTRACT_INFO.save(deps.storage, &msg.target_contract_info)?;
+    OWNER.save(deps.storage, &info.sender.to_string())?;
     PRICE_CONTRACT.save(deps.storage, &msg.price_contract)?; // paloma1xr3rq8yvd7qplsw5yx90ftsr2zdhg4e9z60h5duusgxpv72hud3sac3fdu
     Ok(Response::new().add_attribute("method", "instantiate"))
 }
@@ -38,10 +41,24 @@ pub fn instantiate(
 pub fn execute(
     deps: DepsMut,
     env: Env,
-    _info: MessageInfo,
+    info: MessageInfo,
     msg: ExecuteMsg,
 ) -> Result<Response<CustomResponseMsg>, ContractError> {
     match msg {
+        ExecuteMsg::PutDeposit {
+            depositor,
+            amount,
+            lower_tick,
+            lower_sqrt_price_x96,
+            deadline,
+        } => put_deposit(
+            deps,
+            depositor,
+            amount,
+            lower_tick,
+            lower_sqrt_price_x96,
+            deadline,
+        ),
         ExecuteMsg::GetDeposit {
             token_id,
             sqrt_price_x96,
@@ -50,7 +67,86 @@ pub fn execute(
         ExecuteMsg::PutWithdraw {} => put_withdraw(deps),
         ExecuteMsg::GetWithdraw { token_ids } => get_withdraw(deps, token_ids),
         ExecuteMsg::PutCancel {} => put_cancel(deps, env),
+        ExecuteMsg::TransferOwnership { new_owner } => transfer_ownership(deps, info, new_owner),
+        ExecuteMsg::UpdatePriceContract { new_price_contract } => {
+            update_price_contract(deps, info, new_price_contract)
+        }
     }
+}
+
+fn put_deposit(
+    deps: DepsMut,
+    depositor: String,
+    amount: Uint256,
+    lower_tick: i32,
+    lower_sqrt_price_x96: Uint256,
+    deadline: u64,
+) -> Result<Response<CustomResponseMsg>, ContractError> {
+    let target_contract_info = TARGET_CONTRACT_INFO.load(deps.storage)?;
+    #[allow(deprecated)]
+    let contract: Contract = Contract {
+        constructor: None,
+        functions: BTreeMap::from_iter(vec![(
+            "deposit".to_string(),
+            vec![Function {
+                name: "deposit".to_string(),
+                inputs: vec![
+                    Param {
+                        name: "depositor".to_string(),
+                        kind: ParamType::Address,
+                        internal_type: None,
+                    },
+                    Param {
+                        name: "amount".to_string(),
+                        kind: ParamType::Uint(256),
+                        internal_type: None,
+                    },
+                    Param {
+                        name: "lower_tick".to_string(),
+                        kind: ParamType::Int(24),
+                        internal_type: None,
+                    },
+                    Param {
+                        name: "lower_sqrt_price_x96".to_string(),
+                        kind: ParamType::Uint(256),
+                        internal_type: None,
+                    },
+                    Param {
+                        name: "deadline".to_string(),
+                        kind: ParamType::Uint(256),
+                        internal_type: None,
+                    },
+                ],
+                outputs: Vec::new(),
+                constant: None,
+                state_mutability: StateMutability::NonPayable,
+            }],
+        )]),
+        events: BTreeMap::new(),
+        errors: BTreeMap::new(),
+        receive: false,
+        fallback: false,
+    };
+    Ok(
+        Response::new().add_message(CosmosMsg::Custom(CustomResponseMsg {
+            target_contract_info,
+            payload: Binary(
+                contract
+                    .function("deposit")
+                    .unwrap()
+                    .encode_input(&[
+                        Token::Address(H160::from_str(depositor.as_str()).unwrap()),
+                        Token::Uint(Uint::from_big_endian(amount.to_be_bytes().as_slice())),
+                        Token::Int(Int::from(lower_tick)),
+                        Token::Uint(Uint::from_big_endian(
+                            lower_sqrt_price_x96.to_be_bytes().as_slice(),
+                        )),
+                        Token::Uint(Uint::from(deadline)),
+                    ])
+                    .unwrap(),
+            ),
+        })),
+    )
 }
 
 fn get_deposit(
@@ -279,6 +375,32 @@ fn get_sqrt_price_x96(deps: Deps) -> Uint256 {
         }
     }
     ret.isqrt().try_into().unwrap()
+}
+
+fn transfer_ownership(
+    deps: DepsMut,
+    info: MessageInfo,
+    new_owner: String,
+) -> Result<Response<CustomResponseMsg>, ContractError> {
+    let owner = OWNER.load(deps.storage)?;
+    if owner == info.sender {
+        return Err(ContractError::Unauthorized {});
+    }
+    OWNER.save(deps.storage, &new_owner)?;
+    Ok(Response::new())
+}
+
+fn update_price_contract(
+    deps: DepsMut,
+    info: MessageInfo,
+    new_price_contract: String,
+) -> Result<Response<CustomResponseMsg>, ContractError> {
+    let owner = OWNER.load(deps.storage)?;
+    if owner == info.sender {
+        return Err(ContractError::Unauthorized {});
+    }
+    PRICE_CONTRACT.save(deps.storage, &new_price_contract)?;
+    Ok(Response::new())
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]

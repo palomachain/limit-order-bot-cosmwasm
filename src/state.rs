@@ -13,6 +13,8 @@ pub struct Deposit {
 
 pub const TARGET_CONTRACT_INFO: Item<TargetContractInfo> = Item::new("target_contract_info");
 
+pub const OWNER: Item<String> = Item::new("owner");
+
 pub const PRICE_CONTRACT: Item<String> = Item::new("price_contract");
 
 pub const DEPOSIT: Map<u128, Deposit> = Map::new("deposit");

@@ -36,23 +36,23 @@ library = []
 optimize = """docker run --rm -v "$(pwd)":/code \
   --mount type=volume,source="$(basename "$(pwd)")_cache",target=/code/target \
   --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-  cosmwasm/rust-optimizer:0.12.6
+  cosmwasm/rust-optimizer:0.12.8
 """
 
 [dependencies]
 cosmwasm-std = "1.1.2"
 cosmwasm-storage = "1.1.2"
-cw-storage-plus = "0.15.0"
-cw2 = "0.15.0"
+cw-storage-plus = "0.15.1"
+cw2 = "0.15.1"
 schemars = "0.8.10"
 serde = { version = "1.0.145", default-features = false, features = ["derive"] }
-thiserror = { version = "1.0.35" }
+thiserror = { version = "1.0.37" }
 ethabi = "17.2.0"
 eyre = "0.6.8"
 pyth-sdk = "0.6.1"
 
-getrandom = { version = "0.2.7", features=["js"]}
+getrandom = { version = "0.2.7", features=["custom"]}
 
 [dev-dependencies]
 cosmwasm-schema = "1.1.2"
-cw-multi-test = "0.15.0"
+cw-multi-test = "0.15.1"

@@ -5,6 +5,50 @@
     {
       "type": "object",
       "required": [
+        "put_deposit"
+      ],
+      "properties": {
+        "put_deposit": {
+          "type": "object",
+          "required": [
+            "amount",
+            "deadline",
+            "depositor",
+            "lower_sqrt_price_x96",
+            "lower_tick",
+            "upper_tick"
+          ],
+          "properties": {
+            "amount": {
+              "$ref": "#/definitions/Uint256"
+            },
+            "deadline": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "depositor": {
+              "type": "string"
+            },
+            "lower_sqrt_price_x96": {
+              "$ref": "#/definitions/Uint256"
+            },
+            "lower_tick": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "upper_tick": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
         "get_deposit"
       ],
       "properties": {
@@ -77,6 +121,46 @@
                 "format": "uint128",
                 "minimum": 0.0
               }
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "transfer_ownership"
+      ],
+      "properties": {
+        "transfer_ownership": {
+          "type": "object",
+          "required": [
+            "new_owner"
+          ],
+          "properties": {
+            "new_owner": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "update_price_contract"
+      ],
+      "properties": {
+        "update_price_contract": {
+          "type": "object",
+          "required": [
+            "new_price_contract"
+          ],
+          "properties": {
+            "new_price_contract": {
+              "type": "string"
             }
           }
         }
